@@ -200,6 +200,7 @@ test "memory pool: greater than pointer default alignment" {
     defer pool.deinit();
 
     const foo: *Foo = try pool.create();
+	_ = foo;
 }
 
 test "memory pool: greater than pointer manual alignment" {
@@ -211,4 +212,5 @@ test "memory pool: greater than pointer manual alignment" {
     defer pool.deinit();
 
     const foo: *align(16) Foo = try pool.create();
+	_ = foo;
 }
