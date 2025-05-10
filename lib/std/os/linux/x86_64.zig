@@ -16,17 +16,10 @@ const sockaddr = linux.sockaddr;
 const socklen_t = linux.socklen_t;
 const timespec = linux.timespec;
 
-inline fn rawSyscallNumber(number: SYS) usize {
-    return switch (builtin.abi) {
-        .gnux32, .muslx32 => 0x40000000 | @intFromEnum(number),
-        else => @intFromEnum(number),
-    };
-}
-
 pub fn syscall0(number: SYS) usize {
     return asm volatile ("syscall"
         : [ret] "={rax}" (-> usize),
-        : [number] "{rax}" (rawSyscallNumber(number)),
+        : [number] "{rax}" (@intFromEnum(number)),
         : "rcx", "r11", "memory"
     );
 }
@@ -34,7 +27,7 @@ pub fn syscall0(number: SYS) usize {
 pub fn syscall1(number: SYS, arg1: usize) usize {
     return asm volatile ("syscall"
         : [ret] "={rax}" (-> usize),
-        : [number] "{rax}" (rawSyscallNumber(number)),
+        : [number] "{rax}" (@intFromEnum(number)),
           [arg1] "{rdi}" (arg1),
         : "rcx", "r11", "memory"
     );
@@ -43,7 +36,7 @@ pub fn syscall1(number: SYS, arg1: usize) usize {
 pub fn syscall2(number: SYS, arg1: usize, arg2: usize) usize {
     return asm volatile ("syscall"
         : [ret] "={rax}" (-> usize),
-        : [number] "{rax}" (rawSyscallNumber(number)),
+        : [number] "{rax}" (@intFromEnum(number)),
           [arg1] "{rdi}" (arg1),
           [arg2] "{rsi}" (arg2),
         : "rcx", "r11", "memory"
@@ -53,7 +46,7 @@ pub fn syscall2(number: SYS, arg1: usize, arg2: usize) usize {
 pub fn syscall3(number: SYS, arg1: usize, arg2: usize, arg3: usize) usize {
     return asm volatile ("syscall"
         : [ret] "={rax}" (-> usize),
-        : [number] "{rax}" (rawSyscallNumber(number)),
+        : [number] "{rax}" (@intFromEnum(number)),
           [arg1] "{rdi}" (arg1),
           [arg2] "{rsi}" (arg2),
           [arg3] "{rdx}" (arg3),
@@ -64,7 +57,7 @@ pub fn syscall3(number: SYS, arg1: usize, arg2: usize, arg3: usize) usize {
 pub fn syscall4(number: SYS, arg1: usize, arg2: usize, arg3: usize, arg4: usize) usize {
     return asm volatile ("syscall"
         : [ret] "={rax}" (-> usize),
-        : [number] "{rax}" (rawSyscallNumber(number)),
+        : [number] "{rax}" (@intFromEnum(number)),
           [arg1] "{rdi}" (arg1),
           [arg2] "{rsi}" (arg2),
           [arg3] "{rdx}" (arg3),
@@ -76,7 +69,7 @@ pub fn syscall4(number: SYS, arg1: usize, arg2: usize, arg3: usize, arg4: usize)
 pub fn syscall5(number: SYS, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize) usize {
     return asm volatile ("syscall"
         : [ret] "={rax}" (-> usize),
-        : [number] "{rax}" (rawSyscallNumber(number)),
+        : [number] "{rax}" (@intFromEnum(number)),
           [arg1] "{rdi}" (arg1),
           [arg2] "{rsi}" (arg2),
           [arg3] "{rdx}" (arg3),
@@ -97,7 +90,7 @@ pub fn syscall6(
 ) usize {
     return asm volatile ("syscall"
         : [ret] "={rax}" (-> usize),
-        : [number] "{rax}" (rawSyscallNumber(number)),
+        : [number] "{rax}" (@intFromEnum(number)),
           [arg1] "{rdi}" (arg1),
           [arg2] "{rsi}" (arg2),
           [arg3] "{rdx}" (arg3),
@@ -150,13 +143,13 @@ pub fn restore_rt() callconv(.naked) noreturn {
             \\ movl %[number], %%eax
             \\ syscall
             :
-            : [number] "i" (rawSyscallNumber(SYS.rt_sigreturn)),
+            : [number] "i" (@intFromEnum(SYS.rt_sigreturn)),
             : "rcx", "r11", "memory"
         ),
         else => asm volatile (
             \\ syscall
             :
-            : [number] "{rax}" (rawSyscallNumber(SYS.rt_sigreturn)),
+            : [number] "{rax}" (@intFromEnum(SYS.rt_sigreturn)),
             : "rcx", "r11", "memory"
         ),
     }
@@ -466,9 +459,9 @@ fn getContextInternal() callconv(.naked) usize {
           [fpstate_offset] "i" (@offsetOf(ucontext_t, "mcontext") + @offsetOf(mcontext_t, "fpregs")),
           [fpmem_offset] "i" (@offsetOf(ucontext_t, "fpregs_mem")),
           [mxcsr_offset] "i" (@offsetOf(ucontext_t, "fpregs_mem") + @offsetOf(fpstate, "mxcsr")),
-          [sigaltstack] "i" (rawSyscallNumber(linux.SYS.sigaltstack)),
+          [sigaltstack] "i" (@intFromEnum(linux.SYS.sigaltstack)),
           [stack_offset] "i" (@offsetOf(ucontext_t, "stack")),
-          [sigprocmask] "i" (rawSyscallNumber(linux.SYS.rt_sigprocmask)),
+          [sigprocmask] "i" (@intFromEnum(linux.SYS.rt_sigprocmask)),
           [sigmask_offset] "i" (@offsetOf(ucontext_t, "sigmask")),
           [sigset_size] "i" (@sizeOf(sigset_t)),
         : "cc", "memory", "rax", "rcx", "rdx", "rdi", "rsi", "r8", "r10", "r11"
