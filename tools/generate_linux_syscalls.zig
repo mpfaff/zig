@@ -134,7 +134,7 @@ const arch_infos = [_]ArchInfo{
             .name = "x86",
             .enum_name = "X86",
             .file_path = "arch/x86/entry/syscalls/syscall_32.tbl",
-            .process_file = &processTableBasedArch,
+            .process_file = &processTableBasedArchWithoutOffset,
             .filters = .{
                 .abiCheckParams = null,
                 .fixedName = &fixedName,
@@ -150,7 +150,7 @@ const arch_infos = [_]ArchInfo{
             .name = "x64",
             .enum_name = "X64",
             .file_path = "arch/x86/entry/syscalls/syscall_64.tbl",
-            .process_file = &processTableBasedArch,
+            .process_file = &processTableBasedArchWithoutOffset,
             .filters = .{
                 // The x32 abi syscalls are always at the end.
                 .abiCheckParams = .{ .abi = "x32", .flow = .@"break" },
@@ -167,13 +167,13 @@ const arch_infos = [_]ArchInfo{
             .name = "x32",
             .enum_name = "X32",
             .file_path = "arch/x86/entry/syscalls/syscall_64.tbl",
-            .process_file = &processTableBasedArch,
+            .process_file = &processTableBasedArchWithOffset,
             .filters = .{
                 .abiCheckParams = .{ .abi = "64", .flow = .@"continue" },
                 .fixedName = &fixedName,
                 .isReservedNameOld = null,
             },
-            .header = null,
+            .header = "    const linux_base = 0x40000000;\n\n",
             .extra_values = null,
             .additional_enum = null,
         },
@@ -183,7 +183,7 @@ const arch_infos = [_]ArchInfo{
             .name = "arm",
             .enum_name = "Arm",
             .file_path = "arch/arm/tools/syscall.tbl",
-            .process_file = &processTableBasedArch,
+            .process_file = &processTableBasedArchWithoutOffset,
             .filters = .{
                 .abiCheckParams = .{ .abi = "oabi", .flow = .@"continue" },
                 .fixedName = &fixedName,
@@ -209,7 +209,7 @@ const arch_infos = [_]ArchInfo{
             .name = "sparc",
             .enum_name = "Sparc",
             .file_path = "arch/sparc/kernel/syscalls/syscall.tbl",
-            .process_file = &processTableBasedArch,
+            .process_file = &processTableBasedArchWithoutOffset,
             .filters = .{
                 .abiCheckParams = .{ .abi = "64", .flow = .@"continue" },
                 .fixedName = &fixedName,
@@ -225,7 +225,7 @@ const arch_infos = [_]ArchInfo{
             .name = "sparc64",
             .enum_name = "Sparc64",
             .file_path = "arch/sparc/kernel/syscalls/syscall.tbl",
-            .process_file = &processTableBasedArch,
+            .process_file = &processTableBasedArchWithoutOffset,
             .filters = .{
                 .abiCheckParams = .{ .abi = "32", .flow = .@"continue" },
                 .fixedName = &fixedName,
@@ -241,7 +241,7 @@ const arch_infos = [_]ArchInfo{
             .name = "m68k",
             .enum_name = "M68k",
             .file_path = "arch/m68k/kernel/syscalls/syscall.tbl",
-            .process_file = &processTableBasedArch,
+            .process_file = &processTableBasedArchWithoutOffset,
             .filters = .{
                 // abi is always common
                 .abiCheckParams = null,
@@ -258,7 +258,7 @@ const arch_infos = [_]ArchInfo{
             .name = "mips_o32",
             .enum_name = "MipsO32",
             .file_path = "arch/mips/kernel/syscalls/syscall_o32.tbl",
-            .process_file = &processMipsBasedArch,
+            .process_file = &processTableBasedArchWithOffset,
             .filters = .{
                 // abi is always o32
                 .abiCheckParams = null,
@@ -275,7 +275,7 @@ const arch_infos = [_]ArchInfo{
             .name = "mips_n64",
             .enum_name = "MipsN64",
             .file_path = "arch/mips/kernel/syscalls/syscall_n64.tbl",
-            .process_file = &processMipsBasedArch,
+            .process_file = &processTableBasedArchWithOffset,
             .filters = .{
                 // abi is always n64
                 .abiCheckParams = null,
@@ -292,7 +292,7 @@ const arch_infos = [_]ArchInfo{
             .name = "mips_n32",
             .enum_name = "MipsN32",
             .file_path = "arch/mips/kernel/syscalls/syscall_n32.tbl",
-            .process_file = &processMipsBasedArch,
+            .process_file = &processTableBasedArchWithOffset,
             .filters = .{
                 // abi is always n32
                 .abiCheckParams = null,
@@ -325,7 +325,7 @@ const arch_infos = [_]ArchInfo{
             .name = "s390x",
             .enum_name = "S390x",
             .file_path = "arch/s390/kernel/syscalls/syscall.tbl",
-            .process_file = &processTableBasedArch,
+            .process_file = &processTableBasedArchWithoutOffset,
             .filters = .{
                 // 32-bit s390 support in linux is deprecated
                 .abiCheckParams = .{ .abi = "32", .flow = .@"continue" },
@@ -342,7 +342,7 @@ const arch_infos = [_]ArchInfo{
             .name = "xtensa",
             .enum_name = "Xtensa",
             .file_path = "arch/xtensa/kernel/syscalls/syscall.tbl",
-            .process_file = &processTableBasedArch,
+            .process_file = &processTableBasedArchWithoutOffset,
             .filters = .{
                 // abi is always common
                 .abiCheckParams = null,
@@ -486,6 +486,7 @@ fn processTableBasedArch(
     filters: Filters,
     writer: anytype,
     optional_writer: anytype,
+    offset: bool,
 ) !void {
     _ = optional_writer;
 
@@ -510,41 +511,30 @@ fn processTableBasedArch(
         }
         const fixed_name = if (filters.fixedName) |fixedNameFn| fixedNameFn(name) else name;
 
-        try writer.print("    {p} = {s},\n", .{ zig.fmtId(fixed_name), number });
+        if (offset) {
+            try writer.print("    {p} = linux_base + {s},\n", .{ zig.fmtId(fixed_name), number });
+        } else {
+            try writer.print("    {p} = {s},\n", .{ zig.fmtId(fixed_name), number });
+        }
     }
 }
 
-fn processMipsBasedArch(
+fn processTableBasedArchWithoutOffset(
     bytes: []const u8,
     filters: Filters,
     writer: anytype,
     optional_writer: anytype,
 ) !void {
-    _ = optional_writer;
+    return processTableBasedArch(bytes, filters, writer, optional_writer, false);
+}
 
-    var lines = mem.tokenizeScalar(u8, bytes, '\n');
-    while (lines.next()) |line| {
-        if (line[0] == '#') continue;
-
-        var fields = mem.tokenizeAny(u8, line, " \t");
-        const number = fields.next() orelse return error.Incomplete;
-
-        const abi = fields.next() orelse return error.Incomplete;
-        if (filters.abiCheckParams) |*params| {
-            switch (abiCheck(abi, params)) {
-                .none => {},
-                .@"break" => break,
-                .@"continue" => continue,
-            }
-        }
-        const name = fields.next() orelse return error.Incomplete;
-        if (filters.isReservedNameOld) |isReservedNameOldFn| {
-            if (isReservedNameOldFn(name)) continue;
-        }
-        const fixed_name = if (filters.fixedName) |fixedNameFn| fixedNameFn(name) else name;
-
-        try writer.print("    {p} = linux_base + {s},\n", .{ zig.fmtId(fixed_name), number });
-    }
+fn processTableBasedArchWithOffset(
+    bytes: []const u8,
+    filters: Filters,
+    writer: anytype,
+    optional_writer: anytype,
+) !void {
+    return processTableBasedArch(bytes, filters, writer, optional_writer, true);
 }
 
 fn processPowerPcBasedArch(
